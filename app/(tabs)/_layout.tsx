@@ -1,52 +1,86 @@
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Tabs } from 'expo-router';
-import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const tint = Colors[colorScheme ?? 'light'].tint;
-  const iconDefault = Colors[colorScheme ?? 'light'].tabIconDefault;
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: tint,
-        tabBarInactiveTintColor: iconDefault,
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarShowLabel: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: '#FF4B6E',
+        tabBarInactiveTintColor: '#999',
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="flame"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={26} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flame" size={size} color={color} />
+          ),
         }}
       />
+
       <Tabs.Screen
-        name="agenda"
+        name="search"
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ color }) => <MaterialIcons name="calendar-today" size={26} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="search" size={size} color={color} />
+          ),
         }}
       />
+
+      {/* BOTÃO CENTRAL */}
       <Tabs.Screen
-        name="menu"
+        name="home"
         options={{
-          title: 'Menu',
-          tabBarIcon: ({ color }) => <MaterialIcons name="menu" size={26} color={color} />,
+          tabBarIcon: () => (
+            <View style={styles.centerButton}>
+              <Text style={styles.centerText}>UNOMATCH.</Text>
+            </View>
+          ),
         }}
       />
+
       <Tabs.Screen
-        name="explore"
+        name="chat"
         options={{
-          href: null,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="chat-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    height: 70,
+    paddingBottom: 10,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 0,
+    elevation: 10,
+  },
+  centerButton: {
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  centerText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+});

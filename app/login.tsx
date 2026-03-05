@@ -24,10 +24,10 @@ export default function LoginScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
         <AppText variant="title" style={styles.title}>
-          Bem-vindo
+          Unomatch
         </AppText>
         <AppText variant="body" style={styles.subtitle}>
-          Entre com seu e-mail e senha para continuar.
+          Siga essas regras.
         </AppText>
       </View>
       <LoginForm onSubmit={handleSubmit} loading={loading} />
