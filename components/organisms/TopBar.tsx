@@ -14,7 +14,6 @@ export type TopBarProps = {
 
 export function TopBar({ onNotificationsPress }: TopBarProps) {
   const insets = useSafeAreaInsets();
-  const textColor = useThemeColor({}, 'text');
   const backgroundColor = useThemeColor({}, 'background');
   const iconColor = useThemeColor({}, 'icon');
 

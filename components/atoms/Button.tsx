@@ -32,7 +32,6 @@ export function Button({
   textStyle,
 }: ButtonProps) {
   const tint = useThemeColor({}, 'tint');
-  const textColor = useThemeColor({}, 'text');
   const background = useThemeColor({}, 'background');
 
   const variantStyles: Record<ButtonVariant, { container: ViewStyle; text: TextStyle }> = {

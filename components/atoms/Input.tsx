@@ -14,7 +14,7 @@ export type InputProps = TextInputProps & {
 
 export function Input({ style, error, secureTextEntry, ...rest }: InputProps) {
   const textColor = useThemeColor({}, 'text');
-  const backgroundColor = useThemeColor({}, 'background');
+  const backgroundColor = useThemeColor({}, 'surface');
   const placeholderColor = useThemeColor({}, 'icon');
   const borderColor = error ? '#e74c3c' : 'rgba(0,0,0,0.1)';
 

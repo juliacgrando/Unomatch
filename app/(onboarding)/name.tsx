@@ -1,27 +1,11 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function EmailScreen() {
+export default function NameScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-
-  const alreadyRegistered = registeredUsers.includes(email.toLowerCase());
-
-  const handleContinue = () => {
-    if (!email.includes('@')) {
-      Alert.alert('Erro', 'Digite um e-mail válido.');
-      return;
-    }
-
-    if (alreadyRegistered) {
-      Alert.alert('Erro', 'Este usuário já está cadastrado.');
-      return;
-    }
-
-    router.replace('/(tabs)/home');
-  };
+  const [name, setName] = useState('');
 
   return (
     <View style={styles.container}>
@@ -30,21 +14,23 @@ export default function EmailScreen() {
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <Text style={styles.title}>Insira seu e-mail:</Text>
+        <Text style={styles.title}>Meu nome é:</Text>
 
         <TextInput
           style={styles.input}
-          placeholder="email@exemplo.com"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
+          placeholder="Alan Turing"
+          value={name}
+          onChangeText={setName}
         />
 
+        <Text style={styles.helper}>
+          E assim que seu nome vai aparecer.
+        </Text>
+
         <TouchableOpacity
-          style={[styles.button, (!email || alreadyRegistered) && { opacity: 0.5 }]}
-          disabled={!email || alreadyRegistered}
-          onPress={handleContinue}
+          style={[styles.button, !name && { opacity: 0.5 }]}
+          disabled={!name}
+          onPress={() => router.push('/(onboarding)/email')}
         >
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>
@@ -61,8 +47,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E9ECEF',
     padding: 14,
     borderRadius: 10,
-    marginBottom: 24,
+    marginBottom: 8,
   },
+  helper: { opacity: 0.7, marginBottom: 24 },
   button: {
     backgroundColor: '#FF4B6E',
     padding: 16,

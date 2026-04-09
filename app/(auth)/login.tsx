@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -27,10 +27,15 @@ export default function LoginScreen() {
           Unomatch
         </AppText>
         <AppText variant="body" style={styles.subtitle}>
-          Siga essas regras.
+          Entre com sua conta para continuar.
         </AppText>
       </View>
       <LoginForm onSubmit={handleSubmit} loading={loading} />
+      <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/(onboarding)/name')}>
+        <AppText variant="caption" style={styles.linkText}>
+          Nao tem conta? Criar conta
+        </AppText>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -40,6 +45,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+    backgroundColor: '#F2F2F2',
   },
   header: {
     marginBottom: 32,
@@ -52,5 +58,13 @@ const styles = StyleSheet.create({
   subtitle: {
     textAlign: 'center',
     opacity: 0.8,
+  },
+  linkButton: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  linkText: {
+    color: '#FF4B6E',
+    opacity: 1,
   },
 });

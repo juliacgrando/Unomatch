@@ -1,8 +1,16 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export default function TabLayout() {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
@@ -14,10 +22,12 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="flame"
+        name="index"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flame" size={size} color={color} />
+          tabBarIcon: () => (
+            <View style={styles.centerButton}>
+              <Text style={styles.centerText}>UNOMATCH.</Text>
+            </View>
           ),
         }}
       />
@@ -27,18 +37,6 @@ export default function TabLayout() {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Feather name="search" size={size} color={color} />
-          ),
-        }}
-      />
-
-      {/* BOTÃO CENTRAL */}
-      <Tabs.Screen
-        name="home"
-        options={{
-          tabBarIcon: () => (
-            <View style={styles.centerButton}>
-              <Text style={styles.centerText}>UNOMATCH.</Text>
-            </View>
           ),
         }}
       />
@@ -60,6 +58,7 @@ export default function TabLayout() {
           ),
         }}
       />
+
     </Tabs>
   );
 }
@@ -69,12 +68,13 @@ const styles = StyleSheet.create({
     height: 70,
     paddingBottom: 10,
     paddingTop: 10,
-    backgroundColor: '#fff',
-    borderTopWidth: 0,
+    backgroundColor: '#F2F2F2',
+    borderTopWidth: 1,
+    borderTopColor: '#E6E6E6',
     elevation: 10,
   },
   centerButton: {
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#E9ECEF',
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
