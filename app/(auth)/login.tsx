@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Alert, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -13,11 +13,17 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (email: string, password: string) => {
+  const handleSubmit = async (email: string, password: string) => {
     setLoading(true);
-    login(email, password);
-    setLoading(false);
-    router.replace('/(tabs)');
+
+    try {
+      await login(email, password);
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Nao foi possivel entrar', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

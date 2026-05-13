@@ -1,65 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/atoms/AppText';
+import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type Profile = {
-  id: string;
-  name: string;
-  age: number;
-  course: string;
-  bio: string;
-  interests: string[];
-  distanceKm: number;
-};
-
-const MOCK_PROFILES: Profile[] = [
-  {
-    id: '1',
-    name: 'Amanda',
-    age: 21,
-    course: 'Direito',
-    bio: 'Gosto de trilhas, cafe e conversa boa depois da aula.',
-    interests: ['Trilhas', 'Cafe', 'Leitura'],
-    distanceKm: 2,
-  },
-  {
-    id: '2',
-    name: 'Bruno',
-    age: 23,
-    course: 'Sistemas de Informacao',
-    bio: 'Curto tecnologia, academia e filmes de ficcao.',
-    interests: ['Tech', 'Academia', 'Cinema'],
-    distanceKm: 5,
-  },
-  {
-    id: '3',
-    name: 'Carolina',
-    age: 20,
-    course: 'Medicina',
-    bio: 'Amo musica ao vivo, viagens e fotografia.',
-    interests: ['Musica', 'Viagem', 'Fotografia'],
-    distanceKm: 3,
-  },
-  {
-    id: '4',
-    name: 'Diego',
-    age: 22,
-    course: 'Arquitetura',
-    bio: 'Design, artes visuais e role cultural no fim de semana.',
-    interests: ['Design', 'Arte', 'Musica'],
-    distanceKm: 6,
-  },
-];
+import { Profile, api } from '@/services/api';
 
 const COURSE_FILTERS = ['Todos', 'Sistemas', 'Direito', 'Medicina', 'Arquitetura'];
 const INTEREST_FILTERS = ['Todos', 'Tech', 'Musica', 'Cafe', 'Cinema', 'Academia'];
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const background = useThemeColor({}, 'background');
   const surface = useThemeColor({}, 'surface');
   const text = useThemeColor({}, 'text');
@@ -68,32 +22,49 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [courseFilter, setCourseFilter] = useState('Todos');
   const [interestFilter, setInterestFilter] = useState('Todos');
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
-  const filteredProfiles = useMemo(() => {
-    return MOCK_PROFILES.filter((profile) => {
-      const normalizedQuery = query.trim().toLowerCase();
-      const matchesQuery =
-        normalizedQuery.length === 0
-          || profile.name.toLowerCase().includes(normalizedQuery)
-          || profile.course.toLowerCase().includes(normalizedQuery);
+  const loadProfiles = useCallback(async () => {
+    if (!token) {
+      return;
+    }
 
-      const matchesCourse =
-        courseFilter === 'Todos' || profile.course.toLowerCase().includes(courseFilter.toLowerCase());
+    try {
+      const response = await api.searchProfiles(token, {
+        query: query.trim(),
+        course: courseFilter,
+        interest: interestFilter,
+      });
+      setProfiles(response.profiles);
+    } catch (error) {
+      Alert.alert('Erro ao buscar perfis', error instanceof Error ? error.message : 'Tente novamente.');
+    }
+  }, [courseFilter, interestFilter, query, token]);
 
-      const matchesInterest =
-        interestFilter === 'Todos'
-        || profile.interests.some((interest) => interest.toLowerCase() === interestFilter.toLowerCase());
-
-      return matchesQuery && matchesCourse && matchesInterest;
-    });
-  }, [query, courseFilter, interestFilter]);
+  useEffect(() => {
+    void loadProfiles();
+  }, [loadProfiles]);
 
   const openProfile = (name: string) => {
     Alert.alert('Em breve', `Perfil completo de ${name} sera exibido na proxima etapa.`);
   };
 
-  const likeProfile = (name: string) => {
-    Alert.alert('Like enviado', `Voce demonstrou interesse em ${name}.`);
+  const likeProfile = async (profile: Profile) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await api.swipeProfile(token, profile.id, 'like');
+      Alert.alert(
+        response.matched ? 'Match!' : 'Like enviado',
+        response.matched
+          ? `Voce e ${profile.name} deram match.`
+          : `Voce demonstrou interesse em ${profile.name}.`
+      );
+    } catch (error) {
+      Alert.alert('Erro ao curtir', error instanceof Error ? error.message : 'Tente novamente.');
+    }
   };
 
   return (
@@ -156,14 +127,14 @@ export default function SearchScreen() {
       </View>
 
       <View style={[styles.resultsSection, { backgroundColor: surface }]}>
-        <AppText variant="subtitle" style={styles.resultsTitle}>Resultados ({filteredProfiles.length})</AppText>
-        {filteredProfiles.length === 0 ? (
+        <AppText variant="subtitle" style={styles.resultsTitle}>Resultados ({profiles.length})</AppText>
+        {profiles.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="people-outline" size={24} color={icon} />
             <AppText style={[styles.emptyText, { color: icon }]}>Nenhum perfil encontrado com esses filtros.</AppText>
           </View>
         ) : (
-          filteredProfiles.map((profile) => (
+          profiles.map((profile) => (
             <View key={profile.id} style={styles.profileCard}>
               <View style={styles.profileHeader}>
                 <View style={styles.avatar}>
@@ -190,7 +161,7 @@ export default function SearchScreen() {
                 <Pressable style={styles.outlineAction} onPress={() => openProfile(profile.name)}>
                   <AppText style={styles.outlineActionText}>Ver perfil</AppText>
                 </Pressable>
-                <Pressable style={styles.fillAction} onPress={() => likeProfile(profile.name)}>
+                <Pressable style={styles.fillAction} onPress={() => likeProfile(profile)}>
                   <AppText style={styles.fillActionText}>Curtir</AppText>
                 </Pressable>
               </View>

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -12,62 +12,40 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/atoms/AppText';
+import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type DiscoverProfile = {
-  id: string;
-  name: string;
-  age: number;
-  course: string;
-  bio: string;
-  interests: string[];
-};
-
-const PROFILES: DiscoverProfile[] = [
-  {
-    id: '1',
-    name: 'Amanda',
-    age: 21,
-    course: 'Direito',
-    bio: 'Trilhas, cafe e bons papos depois da aula.',
-    interests: ['Trilhas', 'Cafe', 'Leitura'],
-  },
-  {
-    id: '2',
-    name: 'Bruno',
-    age: 23,
-    course: 'Sistemas de Informacao',
-    bio: 'Tech, academia e maratona de filmes no fim de semana.',
-    interests: ['Tech', 'Academia', 'Cinema'],
-  },
-  {
-    id: '3',
-    name: 'Camila',
-    age: 20,
-    course: 'Medicina',
-    bio: 'Musica ao vivo, fotografia e viagens curtas.',
-    interests: ['Musica', 'Fotografia', 'Viagem'],
-  },
-  {
-    id: '4',
-    name: 'Diego',
-    age: 22,
-    course: 'Arquitetura',
-    bio: 'Design, cultura e eventos da universidade.',
-    interests: ['Design', 'Arte', 'Cafe'],
-  },
-];
+import { Profile, api } from '@/services/api';
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { token } = useAuth();
   const swipeThreshold = width * 0.26;
   const position = useRef(new Animated.ValueXY()).current;
+  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lastAction, setLastAction] = useState<'like' | 'pass' | null>(null);
   const background = useThemeColor({}, 'background');
   const surface = useThemeColor({}, 'surface');
   const icon = useThemeColor({}, 'icon');
+
+  const loadProfiles = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await api.discoverProfiles(token);
+      setProfiles(response.profiles);
+      setCurrentIndex(0);
+    } catch (error) {
+      Alert.alert('Erro ao carregar perfis', error instanceof Error ? error.message : 'Tente novamente.');
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadProfiles();
+  }, [loadProfiles]);
 
   const rotate = position.x.interpolate({
     inputRange: [-width, 0, width],
@@ -87,31 +65,44 @@ export default function DiscoverScreen() {
     extrapolate: 'clamp',
   });
 
-  const resetPosition = () => {
+  const visibleProfiles = profiles.slice(currentIndex, currentIndex + 3);
+
+  const resetPosition = useCallback(() => {
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
       useNativeDriver: false,
       bounciness: 8,
     }).start();
-  };
+  }, [position]);
 
-  const handleSwipeComplete = (action: 'like' | 'pass') => {
+  const handleSwipeComplete = useCallback((action: 'like' | 'pass', profileId?: string) => {
     setLastAction(action);
     position.setValue({ x: 0, y: 0 });
     setCurrentIndex((prev) => prev + 1);
-  };
 
-  const forceSwipe = (action: 'like' | 'pass') => {
+    if (token && profileId) {
+      void api.swipeProfile(token, profileId, action).then((response) => {
+        if (response.matched) {
+          Alert.alert('Match!', 'A afinidade foi reciproca. A conversa ja esta nos chats.');
+        }
+      }).catch((error) => {
+        Alert.alert('Erro ao registrar acao', error instanceof Error ? error.message : 'Tente novamente.');
+      });
+    }
+  }, [position, token]);
+
+  const forceSwipe = useCallback((action: 'like' | 'pass') => {
+    const profile = visibleProfiles[0];
     const toX = action === 'like' ? width + 120 : -width - 120;
 
     Animated.timing(position, {
       toValue: { x: toX, y: 0 },
       duration: 220,
       useNativeDriver: false,
-    }).start(() => handleSwipeComplete(action));
-  };
+    }).start(() => handleSwipeComplete(action, profile?.id));
+  }, [handleSwipeComplete, position, visibleProfiles, width]);
 
-  const panResponder = useRef(
+  const panResponder = useMemo(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_evt, gesture) =>
@@ -132,16 +123,15 @@ export default function DiscoverScreen() {
 
         resetPosition();
       },
-    })
-  ).current;
+    }),
+    [forceSwipe, position, resetPosition, swipeThreshold]
+  );
 
   const restartDeck = () => {
     setCurrentIndex(0);
     setLastAction(null);
     position.setValue({ x: 0, y: 0 });
   };
-
-  const visibleProfiles = PROFILES.slice(currentIndex, currentIndex + 3);
 
   return (
     <View style={[styles.container, { backgroundColor: background, paddingTop: insets.top + 10 }]}>
@@ -153,7 +143,7 @@ export default function DiscoverScreen() {
         </View>
       </View>
 
-      {lastAction && currentIndex < PROFILES.length && (
+      {lastAction && currentIndex < profiles.length && (
         <AppText style={[styles.lastAction, { color: icon }]}>
           Ultima acao: {lastAction === 'like' ? 'curtiu' : 'passou'}
         </AppText>
@@ -169,6 +159,9 @@ export default function DiscoverScreen() {
             </AppText>
             <Pressable style={styles.restartButton} onPress={restartDeck}>
               <AppText style={styles.restartButtonText}>Reiniciar deck</AppText>
+            </Pressable>
+            <Pressable style={styles.reloadButton} onPress={loadProfiles}>
+              <AppText style={styles.reloadButtonText}>Atualizar perfis</AppText>
             </Pressable>
           </View>
         ) : (
@@ -440,6 +433,13 @@ const styles = StyleSheet.create({
   },
   restartButtonText: {
     color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  reloadButton: {
+    marginTop: 10,
+  },
+  reloadButtonText: {
+    color: '#FF4B6E',
     fontWeight: '700',
   },
 });

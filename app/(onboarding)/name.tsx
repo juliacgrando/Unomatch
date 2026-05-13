@@ -30,7 +30,7 @@ export default function NameScreen() {
         <TouchableOpacity
           style={[styles.button, !name && { opacity: 0.5 }]}
           disabled={!name}
-          onPress={() => router.push('/(onboarding)/email')}
+          onPress={() => router.push({ pathname: '/(onboarding)/email', params: { name: name.trim() } })}
         >
           <Text style={styles.buttonText}>Continue</Text>
         </TouchableOpacity>

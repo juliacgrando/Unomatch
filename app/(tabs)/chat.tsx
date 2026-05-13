@@ -1,50 +1,53 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/atoms/AppText';
+import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-
-type ChatItem = {
-  id: string;
-  name: string;
-  message: string;
-  time: string;
-  unreadCount: number;
-  online: boolean;
-  isNewMatch?: boolean;
-};
-
-const MOCK_CHATS: ChatItem[] = [
-  { id: '1', name: 'Ana', message: 'Vamos no cafe da UNO depois da aula?', time: '09:14', unreadCount: 2, online: true, isNewMatch: true },
-  { id: '2', name: 'Pedro', message: 'Gostei da sua ideia sobre o projeto final.', time: 'Ontem', unreadCount: 0, online: false },
-  { id: '3', name: 'Luiza', message: 'Tu vai no evento de tecnologia hoje?', time: 'Ontem', unreadCount: 1, online: true },
-  { id: '4', name: 'Rafael', message: 'Fechou, te encontro na biblioteca.', time: 'Seg', unreadCount: 0, online: false },
-  { id: '5', name: 'Camila', message: 'Match novo! Bora conversar?', time: 'Seg', unreadCount: 4, online: true, isNewMatch: true },
-];
+import { ChatItem, api } from '@/services/api';
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const [query, setQuery] = useState('');
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [chats, setChats] = useState<ChatItem[]>([]);
   const background = useThemeColor({}, 'background');
   const surface = useThemeColor({}, 'surface');
   const text = useThemeColor({}, 'text');
   const icon = useThemeColor({}, 'icon');
   const tint = useThemeColor({}, 'tint');
 
+  const loadChats = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const response = await api.chats(token);
+      setChats(response.chats);
+    } catch (error) {
+      Alert.alert('Erro ao carregar chats', error instanceof Error ? error.message : 'Tente novamente.');
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadChats();
+  }, [loadChats]);
+
   const filteredChats = useMemo(() => {
-    return MOCK_CHATS.filter((chat) => {
+    return chats.filter((chat) => {
       const matchesQuery = chat.name.toLowerCase().includes(query.trim().toLowerCase());
       const matchesUnread = showUnreadOnly ? chat.unreadCount > 0 : true;
       return matchesQuery && matchesUnread;
     });
-  }, [query, showUnreadOnly]);
+  }, [chats, query, showUnreadOnly]);
 
   const newMatches = useMemo(
-    () => MOCK_CHATS.filter((chat) => chat.isNewMatch),
-    []
+    () => chats.filter((chat) => chat.isNewMatch),
+    [chats]
   );
 
   const openChat = (name: string) => {

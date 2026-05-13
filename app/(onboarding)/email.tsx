@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Text, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,14 +8,16 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function EmailScreen() {
   const EMAIL_DOMAIN = '@unochapeco.edu.br';
   const router = useRouter();
-  const { login } = useAuth();
+  const params = useLocalSearchParams<{ name?: string }>();
+  const { register } = useAuth();
   const [emailUser, setEmailUser] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const normalizedEmailUser = emailUser.trim().toLowerCase();
   const hasValidUserPart = /^[a-z0-9._-]+$/.test(normalizedEmailUser);
   const fullEmail = `${normalizedEmailUser}${EMAIL_DOMAIN}`;
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!normalizedEmailUser) {
       Alert.alert('Erro', 'Digite seu usuario institucional.');
       return;
@@ -26,8 +28,20 @@ export default function EmailScreen() {
       return;
     }
 
-    login(fullEmail, 'placeholder-password');
-    router.replace('/(tabs)');
+    setLoading(true);
+
+    try {
+      await register({
+        name: params.name || 'Novo usuario',
+        email: fullEmail,
+        password: 'unomatch',
+      });
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Nao foi possivel criar a conta', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,10 +68,10 @@ export default function EmailScreen() {
 
         <TouchableOpacity
           style={[styles.button, (!normalizedEmailUser || !hasValidUserPart) && { opacity: 0.5 }]}
-          disabled={!normalizedEmailUser || !hasValidUserPart}
+          disabled={loading || !normalizedEmailUser || !hasValidUserPart}
           onPress={handleContinue}
         >
-          <Text style={styles.buttonText}>Continue</Text>
+          <Text style={styles.buttonText}>{loading ? 'Criando conta...' : 'Continue'}</Text>
         </TouchableOpacity>
       </View>
     </View>
