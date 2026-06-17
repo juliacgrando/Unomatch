@@ -77,9 +77,6 @@ export default function ProfileScreen() {
           <TouchableOpacity style={[styles.outlineButton, { borderColor: tint }]} onPress={() => handleEdit('dados basicos')}>
             <AppText style={[styles.outlineButtonText, { color: tint }]}>Editar perfil</AppText>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.fillButton} onPress={() => handleEdit('fotos')}>
-            <AppText style={styles.fillButtonText}>Gerenciar fotos</AppText>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -211,8 +208,6 @@ const styles = StyleSheet.create({
   },
   heroActions: {
     width: '100%',
-    flexDirection: 'row',
-    gap: 10,
   },
   outlineButton: {
     flex: 1,
@@ -222,17 +217,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   outlineButtonText: {
-    fontWeight: '600',
-  },
-  fillButton: {
-    flex: 1,
-    backgroundColor: '#FF4B6E',
-    paddingVertical: 12,
-    borderRadius: 999,
-    alignItems: 'center',
-  },
-  fillButtonText: {
-    color: '#FFFFFF',
     fontWeight: '600',
   },
   statsRow: {

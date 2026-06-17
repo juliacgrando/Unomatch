@@ -1,24 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppText } from '@/components/atoms/AppText';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { ChatItem, api } from '@/services/api';
+import { ChatItem, Message, api } from '@/services/api';
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
-  const [query, setQuery] = useState('');
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const { token, user } = useAuth();
   const [chats, setChats] = useState<ChatItem[]>([]);
+  const [selectedChat, setSelectedChat] = useState<ChatItem | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState('');
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sending, setSending] = useState(false);
   const background = useThemeColor({}, 'background');
   const surface = useThemeColor({}, 'surface');
   const text = useThemeColor({}, 'text');
   const icon = useThemeColor({}, 'icon');
-  const tint = useThemeColor({}, 'tint');
 
   const loadChats = useCallback(async () => {
     if (!token) {
@@ -37,22 +49,155 @@ export default function ChatScreen() {
     void loadChats();
   }, [loadChats]);
 
-  const filteredChats = useMemo(() => {
-    return chats.filter((chat) => {
-      const matchesQuery = chat.name.toLowerCase().includes(query.trim().toLowerCase());
-      const matchesUnread = showUnreadOnly ? chat.unreadCount > 0 : true;
-      return matchesQuery && matchesUnread;
-    });
-  }, [chats, query, showUnreadOnly]);
-
   const newMatches = useMemo(
     () => chats.filter((chat) => chat.isNewMatch),
     [chats]
   );
 
-  const openChat = (name: string) => {
-    Alert.alert('Em breve', `Conversa com ${name} sera habilitada na proxima etapa.`);
+  const openChat = async (chat: ChatItem) => {
+    if (!token) {
+      return;
+    }
+
+    setSelectedChat(chat);
+    setLoadingMessages(true);
+
+    try {
+      const response = await api.messages(token, chat.id);
+      setMessages(response.messages);
+      setChats((current) =>
+        current.map((item) =>
+          item.id === chat.id ? { ...item, unreadCount: 0, isNewMatch: false } : item
+        )
+      );
+    } catch (error) {
+      Alert.alert('Erro ao abrir conversa', error instanceof Error ? error.message : 'Tente novamente.');
+      setSelectedChat(null);
+    } finally {
+      setLoadingMessages(false);
+    }
   };
+
+  const closeChat = () => {
+    setSelectedChat(null);
+    setMessages([]);
+    setDraft('');
+    void loadChats();
+  };
+
+  const sendMessage = async () => {
+    const textToSend = draft.trim();
+    if (!token || !selectedChat || !textToSend || sending) {
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      const response = await api.sendMessage(token, selectedChat.id, textToSend);
+      setMessages((current) => [...current, response.message]);
+      setDraft('');
+      setChats((current) =>
+        current.map((chat) =>
+          chat.id === selectedChat.id
+            ? { ...chat, message: textToSend, time: 'Agora', unreadCount: 0, isNewMatch: false }
+            : chat
+        )
+      );
+    } catch (error) {
+      Alert.alert('Erro ao enviar mensagem', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (selectedChat) {
+    return (
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[styles.container, { backgroundColor: background }]}
+      >
+        <View style={[styles.chatHeader, { paddingTop: insets.top + 12, backgroundColor: surface }]}>
+          <Pressable style={styles.backButton} onPress={closeChat}>
+            <Ionicons name="chevron-back" size={22} color={text} />
+          </Pressable>
+          <View style={styles.avatar}>
+            <AppText style={styles.avatarText}>{selectedChat.name.slice(0, 1)}</AppText>
+          </View>
+          <View style={styles.headerText}>
+            <AppText variant="subtitle">{selectedChat.name}</AppText>
+            <AppText style={[styles.statusText, { color: icon }]}>
+              {selectedChat.online ? 'Online agora' : 'Conversa do match'}
+            </AppText>
+          </View>
+        </View>
+
+        <ScrollView
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loadingMessages ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator color="#FF4B6E" />
+              <AppText style={[styles.emptyText, { color: icon }]}>Carregando conversa...</AppText>
+            </View>
+          ) : messages.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubble-ellipses-outline" size={28} color={icon} />
+              <AppText style={[styles.emptyText, { color: icon }]}>Comece a conversa.</AppText>
+            </View>
+          ) : (
+            messages.map((message) => {
+              const isMine = message.senderId === user?.id;
+              return (
+                <View
+                  key={message.id}
+                  style={[
+                    styles.messageBubble,
+                    isMine ? styles.myMessage : styles.theirMessage,
+                    { backgroundColor: isMine ? '#FF4B6E' : surface },
+                  ]}
+                >
+                  <AppText style={[styles.messageText, { color: isMine ? '#FFFFFF' : text }]}>
+                    {message.text}
+                  </AppText>
+                  <AppText style={[styles.messageTime, { color: isMine ? '#FFE3EA' : icon }]}>
+                    {new Date(message.createdAt).toLocaleTimeString('pt-BR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </AppText>
+                </View>
+              );
+            })
+          )}
+        </ScrollView>
+
+        <View style={[styles.composer, { paddingBottom: insets.bottom + 12, backgroundColor: background }]}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Digite uma mensagem"
+            placeholderTextColor={icon}
+            multiline
+            style={[styles.composerInput, { backgroundColor: surface, color: text }]}
+          />
+          <Pressable
+            style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]}
+            onPress={sendMessage}
+            disabled={!draft.trim() || sending}
+          >
+            {sending ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Ionicons name="send" size={18} color="#FFFFFF" />
+            )}
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <ScrollView
@@ -62,62 +207,35 @@ export default function ChatScreen() {
     >
       <View style={styles.header}>
         <AppText variant="title">Chats</AppText>
-        <Pressable style={styles.iconButton} onPress={() => Alert.alert('Em breve', 'Filtro avancado sera adicionado.')}>
-          <Ionicons name="options-outline" size={20} color={text} />
-        </Pressable>
       </View>
-      <AppText style={[styles.subtitle, { color: icon }]}>Converse com seus matches da UNOCHAPECO.</AppText>
+      <AppText style={[styles.subtitle, { color: icon }]}>Abra uma conversa e envie mensagens pelo backend online.</AppText>
 
-      <View style={[styles.searchRow, { backgroundColor: surface }]}>
-        <Ionicons name="search-outline" size={18} color={icon} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Buscar conversa"
-          placeholderTextColor={icon}
-          style={[styles.searchInput, { color: text }]}
-        />
-      </View>
-
-      <View style={styles.filterRow}>
-        <Pressable
-          style={[styles.filterButton, { borderColor: tint }, !showUnreadOnly && { backgroundColor: '#FF4B6E' }]}
-          onPress={() => setShowUnreadOnly(false)}
-        >
-          <AppText style={[styles.filterText, !showUnreadOnly && styles.filterTextActive]}>Todas</AppText>
-        </Pressable>
-        <Pressable
-          style={[styles.filterButton, { borderColor: tint }, showUnreadOnly && { backgroundColor: '#FF4B6E' }]}
-          onPress={() => setShowUnreadOnly(true)}
-        >
-          <AppText style={[styles.filterText, showUnreadOnly && styles.filterTextActive]}>Nao lidas</AppText>
-        </Pressable>
-      </View>
-
-      <View style={[styles.section, { backgroundColor: surface }]}>
-        <AppText variant="subtitle" style={styles.sectionTitle}>Matches novos</AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.matchList}>
-          {newMatches.map((match) => (
-            <Pressable key={match.id} style={styles.matchPill} onPress={() => openChat(match.name)}>
-              <View style={styles.avatar}>
-                <AppText style={styles.avatarText}>{match.name.slice(0, 1)}</AppText>
-              </View>
-              <AppText style={styles.matchName}>{match.name}</AppText>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+      {newMatches.length > 0 ? (
+        <View style={[styles.section, { backgroundColor: surface }]}>
+          <AppText variant="subtitle" style={styles.sectionTitle}>Matches novos</AppText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.matchList}>
+            {newMatches.map((match) => (
+              <Pressable key={match.id} style={styles.matchPill} onPress={() => openChat(match)}>
+                <View style={styles.avatar}>
+                  <AppText style={styles.avatarText}>{match.name.slice(0, 1)}</AppText>
+                </View>
+                <AppText style={styles.matchName}>{match.name}</AppText>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <View style={[styles.section, { backgroundColor: surface }]}>
         <AppText variant="subtitle" style={styles.sectionTitle}>Conversas</AppText>
-        {filteredChats.length === 0 ? (
+        {chats.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="chatbubble-ellipses-outline" size={24} color={icon} />
             <AppText style={[styles.emptyText, { color: icon }]}>Nenhuma conversa encontrada.</AppText>
           </View>
         ) : (
-          filteredChats.map((chat) => (
-            <Pressable key={chat.id} style={styles.chatRow} onPress={() => openChat(chat.name)}>
+          chats.map((chat) => (
+            <Pressable key={chat.id} style={styles.chatRow} onPress={() => openChat(chat)}>
               <View style={styles.chatLeft}>
                 <View style={styles.avatar}>
                   <AppText style={styles.avatarText}>{chat.name.slice(0, 1)}</AppText>
@@ -157,52 +275,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#E9ECEF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 4,
   },
   subtitle: {
-    marginTop: 4,
     marginBottom: 14,
-  },
-  searchRow: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  filterButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  filterText: {
-    color: '#FF4B6E',
-    fontWeight: '600',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
   },
   section: {
     borderRadius: 16,
@@ -296,6 +372,89 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  chatHeader: {
+    minHeight: 86,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#E9ECEF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerText: {
+    flex: 1,
+  },
+  statusText: {
+    fontSize: 13,
+  },
+  messagesList: {
+    flex: 1,
+  },
+  messagesContent: {
+    padding: 16,
+    gap: 10,
+  },
+  messageBubble: {
+    maxWidth: '82%',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  myMessage: {
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+  },
+  theirMessage: {
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    fontSize: 15,
+  },
+  messageTime: {
+    fontSize: 11,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  composer: {
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  composerInput: {
+    flex: 1,
+    minHeight: 46,
+    maxHeight: 110,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  sendButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#FF4B6E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  loadingState: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    gap: 10,
   },
   emptyState: {
     alignItems: 'center',

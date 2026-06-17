@@ -82,19 +82,25 @@ export default function EmailScreen() {
 
         <TextInput
           style={styles.passwordInput}
-          placeholder="Senha"
+          placeholder="Digite sua senha"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
         />
+        <Text style={styles.passwordHint}>Use pelo menos 6 caracteres.</Text>
 
         <TextInput
           style={styles.passwordInput}
-          placeholder="Confirmar senha"
+          placeholder="Confirme sua senha"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
         />
+        {confirmPassword.length > 0 && password !== confirmPassword ? (
+          <Text style={styles.errorText}>As senhas precisam ser iguais.</Text>
+        ) : (
+          <Text style={styles.passwordHint}>Repita a mesma senha para confirmar.</Text>
+        )}
 
         <TouchableOpacity
           style={[styles.button, !canSubmit && { opacity: 0.5 }]}
@@ -130,6 +136,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#E9ECEF',
     padding: 14,
     borderRadius: 10,
+    marginBottom: 6,
+  },
+  passwordHint: {
+    fontSize: 12,
+    opacity: 0.65,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: '#B4233D',
+    fontSize: 12,
+    fontWeight: '600',
     marginBottom: 12,
   },
   domain: {
