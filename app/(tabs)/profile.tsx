@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,6 +7,28 @@ import { AppText } from '@/components/atoms/AppText';
 import { Button } from '@/components/atoms/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColor } from '@/hooks/use-theme-color';
+
+type ProfileForm = {
+  name: string;
+  age: string;
+  course: string;
+  bio: string;
+  interests: string;
+  minAge: string;
+  maxAge: string;
+  maxDistanceKm: string;
+};
+
+const emptyForm: ProfileForm = {
+  name: '',
+  age: '',
+  course: '',
+  bio: '',
+  interests: '',
+  minAge: '',
+  maxAge: '',
+  maxDistanceKm: '',
+};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -19,17 +41,30 @@ export default function ProfileScreen() {
   const icon = useThemeColor({}, 'icon');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showOnlyUniversity, setShowOnlyUniversity] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
 
   useEffect(() => {
     void refreshUser();
   }, [refreshUser]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isEditing) {
       setNotificationsEnabled(user.notificationsEnabled);
       setShowOnlyUniversity(user.showOnlyUniversity);
+      setForm({
+        name: user.name,
+        age: String(user.age),
+        course: user.course,
+        bio: user.bio,
+        interests: user.interests.join(', '),
+        minAge: String(user.minAge),
+        maxAge: String(user.maxAge),
+        maxDistanceKm: String(user.maxDistanceKm),
+      });
     }
-  }, [user]);
+  }, [isEditing, user]);
 
   const initials = (user?.name || 'U')
     .split(' ')
@@ -37,6 +72,32 @@ export default function ProfileScreen() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const updateField = (field: keyof ProfileForm, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const startEditing = () => {
+    if (user) {
+      setForm({
+        name: user.name,
+        age: String(user.age),
+        course: user.course,
+        bio: user.bio,
+        interests: user.interests.join(', '),
+        minAge: String(user.minAge),
+        maxAge: String(user.maxAge),
+        maxDistanceKm: String(user.maxDistanceKm),
+      });
+    }
+
+    setIsEditing(true);
+  };
+
+  const asPositiveNumber = (value: string, fallback: number) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
 
   const handleLogout = async () => {
     try {
@@ -48,15 +109,40 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     try {
-      await updateProfile({ notificationsEnabled, showOnlyUniversity });
+      setSaving(true);
+
+      const patch = isEditing
+        ? {
+            name: form.name.trim(),
+            age: asPositiveNumber(form.age, user?.age || 20),
+            course: form.course.trim(),
+            bio: form.bio.trim(),
+            interests: form.interests
+              .split(',')
+              .map((interest) => interest.trim())
+              .filter(Boolean)
+              .slice(0, 12),
+            minAge: asPositiveNumber(form.minAge, user?.minAge || 18),
+            maxAge: asPositiveNumber(form.maxAge, user?.maxAge || 24),
+            maxDistanceKm: asPositiveNumber(form.maxDistanceKm, user?.maxDistanceKm || 15),
+            notificationsEnabled,
+            showOnlyUniversity,
+          }
+        : { notificationsEnabled, showOnlyUniversity };
+
+      if (isEditing && (!patch.name || !patch.course || !patch.bio || patch.interests.length === 0)) {
+        Alert.alert('Revise o perfil', 'Preencha nome, curso, bio e pelo menos um interesse.');
+        return;
+      }
+
+      await updateProfile(patch);
+      setIsEditing(false);
       Alert.alert('Pronto', 'Dados salvos no backend.');
     } catch (error) {
       Alert.alert('Erro ao salvar', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setSaving(false);
     }
-  };
-
-  const handleEdit = (section: string) => {
-    Alert.alert('Em breve', `Edicao de "${section}" chega na proxima versao.`);
   };
 
   return (
@@ -71,14 +157,113 @@ export default function ProfileScreen() {
         </View>
         <AppText variant="title" style={styles.name}>{user?.name || 'Perfil'}</AppText>
         <AppText style={[styles.meta, { color: icon }]}>
-          {user ? `${user.age} anos • ${user.course} • ${user.university}` : 'Carregando perfil...'}
+          {user ? `${user.age} anos - ${user.course} - ${user.university}` : 'Carregando perfil...'}
         </AppText>
         <View style={styles.heroActions}>
-          <TouchableOpacity style={[styles.outlineButton, { borderColor: tint }]} onPress={() => handleEdit('dados basicos')}>
-            <AppText style={[styles.outlineButtonText, { color: tint }]}>Editar perfil</AppText>
+          <TouchableOpacity
+            style={[styles.outlineButton, { borderColor: tint }]}
+            onPress={isEditing ? () => setIsEditing(false) : startEditing}
+          >
+            <AppText style={[styles.outlineButtonText, { color: tint }]}>
+              {isEditing ? 'Cancelar edicao' : 'Editar perfil'}
+            </AppText>
           </TouchableOpacity>
         </View>
       </View>
+
+      {isEditing ? (
+        <View style={[styles.section, { backgroundColor: surface }]}>
+          <AppText variant="subtitle">Editar informacoes</AppText>
+
+          <AppText style={styles.inputLabel}>Nome</AppText>
+          <TextInput
+            value={form.name}
+            onChangeText={(value) => updateField('name', value)}
+            placeholder="Seu nome"
+            placeholderTextColor={icon}
+            style={[styles.input, { color: text }]}
+          />
+
+          <View style={styles.inputGrid}>
+            <View style={styles.inputColumn}>
+              <AppText style={styles.inputLabel}>Idade</AppText>
+              <TextInput
+                value={form.age}
+                onChangeText={(value) => updateField('age', value)}
+                keyboardType="number-pad"
+                placeholder="20"
+                placeholderTextColor={icon}
+                style={[styles.input, { color: text }]}
+              />
+            </View>
+            <View style={styles.inputColumn}>
+              <AppText style={styles.inputLabel}>Curso</AppText>
+              <TextInput
+                value={form.course}
+                onChangeText={(value) => updateField('course', value)}
+                placeholder="Seu curso"
+                placeholderTextColor={icon}
+                style={[styles.input, { color: text }]}
+              />
+            </View>
+          </View>
+
+          <AppText style={styles.inputLabel}>Bio</AppText>
+          <TextInput
+            value={form.bio}
+            onChangeText={(value) => updateField('bio', value)}
+            placeholder="Conte algo sobre voce"
+            placeholderTextColor={icon}
+            multiline
+            style={[styles.input, styles.multilineInput, { color: text }]}
+          />
+
+          <AppText style={styles.inputLabel}>Interesses</AppText>
+          <TextInput
+            value={form.interests}
+            onChangeText={(value) => updateField('interests', value)}
+            placeholder="Cafe, tecnologia, musica"
+            placeholderTextColor={icon}
+            style={[styles.input, { color: text }]}
+          />
+          <AppText style={[styles.helperText, { color: icon }]}>Separe os interesses por virgula.</AppText>
+
+          <View style={styles.inputGrid}>
+            <View style={styles.inputColumn}>
+              <AppText style={styles.inputLabel}>Idade min.</AppText>
+              <TextInput
+                value={form.minAge}
+                onChangeText={(value) => updateField('minAge', value)}
+                keyboardType="number-pad"
+                placeholder="18"
+                placeholderTextColor={icon}
+                style={[styles.input, { color: text }]}
+              />
+            </View>
+            <View style={styles.inputColumn}>
+              <AppText style={styles.inputLabel}>Idade max.</AppText>
+              <TextInput
+                value={form.maxAge}
+                onChangeText={(value) => updateField('maxAge', value)}
+                keyboardType="number-pad"
+                placeholder="24"
+                placeholderTextColor={icon}
+                style={[styles.input, { color: text }]}
+              />
+            </View>
+          </View>
+
+          <AppText style={styles.inputLabel}>Distancia maxima em km</AppText>
+          <TextInput
+            value={form.maxDistanceKm}
+            onChangeText={(value) => updateField('maxDistanceKm', value)}
+            keyboardType="number-pad"
+            placeholder="15"
+            placeholderTextColor={icon}
+            style={[styles.input, { color: text }]}
+          />
+        </View>
+      ) : null}
 
       <View style={styles.statsRow}>
         <View style={[styles.statCard, { backgroundColor: surface }]}>
@@ -100,7 +285,7 @@ export default function ProfileScreen() {
         <AppText style={[styles.sectionText, { color: text }]}>
           {user?.bio || 'Adicione uma bio para aparecer melhor no Unomatch.'}
         </AppText>
-        <TouchableOpacity onPress={() => handleEdit('sobre mim')}>
+        <TouchableOpacity onPress={startEditing}>
           <AppText style={[styles.sectionAction, { color: tint }]}>Editar bio</AppText>
         </TouchableOpacity>
       </View>
@@ -114,7 +299,7 @@ export default function ProfileScreen() {
             </View>
           ))}
         </View>
-        <TouchableOpacity onPress={() => handleEdit('interesses')}>
+        <TouchableOpacity onPress={startEditing}>
           <AppText style={[styles.sectionAction, { color: tint }]}>Editar interesses</AppText>
         </TouchableOpacity>
       </View>
@@ -157,14 +342,13 @@ export default function ProfileScreen() {
             thumbColor={notificationsEnabled ? '#FF4B6E' : '#F4F4F4'}
           />
         </View>
-        <TouchableOpacity onPress={() => handleEdit('senha')}>
-          <AppText style={[styles.sectionAction, { color: tint }]}>Alterar senha</AppText>
-        </TouchableOpacity>
       </View>
 
       <Button
-        title="Salvar alteracoes"
+        title={saving ? 'Salvando...' : 'Salvar alteracoes'}
         onPress={handleSave}
+        disabled={saving}
+        loading={saving}
         style={styles.saveButton}
       />
       <Button title="Sair da conta" onPress={handleLogout} variant="outline" style={styles.logoutButton} />
@@ -251,6 +435,35 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontWeight: '600',
   },
+  inputLabel: {
+    marginTop: 12,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D9DDE3',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    fontSize: 15,
+  },
+  multilineInput: {
+    minHeight: 92,
+    textAlignVertical: 'top',
+  },
+  helperText: {
+    marginTop: 6,
+    fontSize: 12,
+  },
+  inputGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  inputColumn: {
+    flex: 1,
+  },
   chipsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -273,12 +486,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
+    gap: 10,
   },
   preferenceLabel: {
     fontWeight: '500',
+    flexShrink: 0,
   },
   preferenceValue: {
     fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   saveButton: {
     marginTop: 6,
