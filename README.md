@@ -42,7 +42,13 @@ Em outro terminal, inicie o Expo:
 npm start
 ```
 
-A API roda por padrao em `http://localhost:3333`. No emulador Android ou celular fisico, o app tenta usar automaticamente o host do Expo. Se precisar, defina o endereco da sua maquina na rede:
+A API publica roda no Railway:
+
+```bash
+https://api-production-7e3c.up.railway.app
+```
+
+Por padrao, o app aponta para essa API publica. Para desenvolvimento local, voce pode sobrescrever a URL:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://SEU_IP_LOCAL:3333 npm start
