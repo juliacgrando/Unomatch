@@ -39,7 +39,7 @@ npm run api
 Em outro terminal, inicie o Expo:
 
 ```bash
-npm start
+npm run web
 ```
 
 A API publica roda no Railway:
