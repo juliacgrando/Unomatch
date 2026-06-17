@@ -190,7 +190,6 @@ async function handleRequest(req, res) {
     return;
   }
 
-  const state = readState();
   const url = new URL(req.url, `http://${req.headers.host}`);
   const path = url.pathname;
 
@@ -200,11 +199,13 @@ async function handleRequest(req, res) {
       return;
     }
 
+    const state = await readState();
+
     if (req.method === 'POST' && path === '/auth/register') {
       const body = await parseBody(req);
       const name = String(body.name || '').trim();
       const email = normalizeEmail(body.email);
-      const password = String(body.password || 'unomatch');
+      const password = String(body.password || '');
 
       if (!name) {
         sendError(res, 400, 'Informe o nome.');
@@ -213,6 +214,11 @@ async function handleRequest(req, res) {
 
       if (!validateInstitutionalEmail(email)) {
         sendError(res, 400, `Use um e-mail institucional ${INSTITUTIONAL_DOMAIN}.`);
+        return;
+      }
+
+      if (password.length < 6) {
+        sendError(res, 400, 'Informe uma senha com pelo menos 6 caracteres.');
         return;
       }
 
@@ -242,7 +248,7 @@ async function handleRequest(req, res) {
       };
       state.users.push(user);
       const session = createSession(state, user.id);
-      writeState(state);
+      await writeState(state);
       sendJson(res, 201, { token: session.token, user: publicUser(user) });
       return;
     }
@@ -260,7 +266,7 @@ async function handleRequest(req, res) {
 
       const session = createSession(state, user.id);
       user.online = true;
-      writeState(state);
+      await writeState(state);
       sendJson(res, 200, { token: session.token, user: publicUser(user) });
       return;
     }
@@ -273,7 +279,7 @@ async function handleRequest(req, res) {
 
       state.sessions = state.sessions.filter((session) => session.token !== auth.session.token);
       auth.user.online = false;
-      writeState(state);
+      await writeState(state);
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -296,7 +302,7 @@ async function handleRequest(req, res) {
 
       const body = await parseBody(req);
       Object.assign(auth.user, sanitizeUserPatch(body), { updatedAt: nowIso() });
-      writeState(state);
+      await writeState(state);
       sendJson(res, 200, { user: publicUser(auth.user) });
       return;
     }
@@ -379,7 +385,7 @@ async function handleRequest(req, res) {
         state.matches.push(match);
       }
 
-      writeState(state);
+      await writeState(state);
       sendJson(res, 200, { ok: true, matched: Boolean(match && action === 'like'), match });
       return;
     }
@@ -437,7 +443,7 @@ async function handleRequest(req, res) {
             message.readBy.push(auth.user.id);
           }
         });
-        writeState(state);
+        await writeState(state);
         sendJson(res, 200, { messages });
         return;
       }
@@ -459,7 +465,7 @@ async function handleRequest(req, res) {
           createdAt: nowIso(),
         };
         state.messages.push(message);
-        writeState(state);
+        await writeState(state);
         sendJson(res, 201, { message });
         return;
       }

@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String    @id
+  name                 String
+  email                String    @unique
+  passwordHash         String
+  age                  Int
+  course               String
+  bio                  String
+  interests            String[]
+  university           String
+  distanceKm           Int
+  notificationsEnabled Boolean   @default(true)
+  showOnlyUniversity   Boolean   @default(true)
+  minAge               Int
+  maxAge               Int
+  maxDistanceKm        Int
+  online               Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime?
+
+  @@map("users")
+}
+
+model Session {
+  token     String   @id
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("sessions")
+}
+
+model Swipe {
+  id         String   @id
+  fromUserId String
+  toUserId   String
+  action     String
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId])
+  @@map("swipes")
+}
+
+model Match {
+  id        String   @id
+  userIds   String[]
+  createdAt DateTime @default(now())
+
+  @@map("matches")
+}
+
+model Message {
+  id        String   @id
+  matchId   String
+  senderId  String
+  text      String
+  readBy    String[]
+  createdAt DateTime @default(now())
+
+  @@map("messages")
+}

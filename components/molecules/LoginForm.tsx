@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 
 import { AppText } from '@/components/atoms/AppText';
 import { Button } from '@/components/atoms/Button';
@@ -12,14 +12,15 @@ export type LoginFormProps = {
 
 export function LoginForm({ onSubmit, loading = false }: LoginFormProps) {
   const EMAIL_DOMAIN = '@unochapeco.edu.br';
-  const [emailUser, setEmailUser] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const normalizedEmailUser = emailUser.trim().toLowerCase();
-  const hasValidUserPart = /^[a-z0-9._-]+$/.test(normalizedEmailUser);
-  const canSubmit = normalizedEmailUser.length > 0 && hasValidUserPart && password.length > 0;
+  const normalizedEmail = email.trim().toLowerCase();
+  const fullEmail = normalizedEmail.includes('@') ? normalizedEmail : `${normalizedEmail}${EMAIL_DOMAIN}`;
+  const hasValidEmail = /^[a-z0-9._-]+@unochapeco\.edu\.br$/.test(fullEmail);
+  const canSubmit = normalizedEmail.length > 0 && hasValidEmail && password.length > 0;
 
   const handleSubmit = () => {
-    onSubmit(`${normalizedEmailUser}${EMAIL_DOMAIN}`, password);
+    onSubmit(fullEmail, password);
   };
 
   return (
@@ -31,23 +32,21 @@ export function LoginForm({ onSubmit, loading = false }: LoginFormProps) {
         <AppText variant="caption" style={styles.label}>
           E-mail institucional
         </AppText>
-        <View style={styles.emailRow}>
-          <TextInput
-            style={styles.emailInput}
-            value={emailUser}
-            onChangeText={setEmailUser}
-            placeholder="seu.nome"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-          />
-          <AppText style={styles.domain}>{EMAIL_DOMAIN}</AppText>
-        </View>
+        <TextInput
+          style={styles.emailInput}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="julia.teste@unochapeco.edu.br"
+          placeholderTextColor="#7A7A7A"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+        />
         <InputWithLabel
           label="Senha"
           value={password}
           onChangeText={setPassword}
-          placeholder="••••••••"
+          placeholder="Senha"
           secureTextEntry
         />
         <Button
@@ -55,8 +54,13 @@ export function LoginForm({ onSubmit, loading = false }: LoginFormProps) {
           onPress={handleSubmit}
           disabled={!canSubmit}
           loading={loading}
-          style={styles.button}
+          style={[styles.button, !canSubmit && styles.disabledButton]}
         />
+        {!hasValidEmail && normalizedEmail.length > 0 ? (
+          <AppText variant="caption" style={styles.errorText}>
+            Use um e-mail @unochapeco.edu.br.
+          </AppText>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -68,33 +72,34 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     alignSelf: 'center',
   },
   label: {
     marginBottom: 6,
   },
-  emailRow: {
+  emailInput: {
     width: '100%',
     marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#E9ECEF',
+    borderColor: 'rgba(0,0,0,0.1)',
     borderRadius: 12,
-    paddingRight: 12,
-  },
-  emailInput: {
-    flex: 1,
+    borderWidth: 1.5,
+    color: '#1B1B1B',
+    fontSize: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 16,
-    color: '#1B1B1B',
-  },
-  domain: {
-    opacity: 0.8,
-    fontWeight: '600',
   },
   button: {
     marginTop: 8,
+  },
+  disabledButton: {
+    opacity: 0.55,
+  },
+  errorText: {
+    color: '#9A1F3A',
+    marginTop: 10,
+    opacity: 1,
+    textAlign: 'center',
   },
 });

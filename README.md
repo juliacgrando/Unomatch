@@ -1,6 +1,8 @@
 # Unomatch
 
-Aplicativo Expo/React Native para conexoes entre estudantes da UNOCHAPECO, agora com uma API Node local para autenticar usuarios, listar perfis, registrar curtidas/passadas, gerar matches e exibir chats.
+Aplicativo Expo/React Native para conexoes entre estudantes da UNOCHAPECO, com uma API Node local para autenticar usuarios, listar perfis, registrar curtidas/passadas, gerar matches e exibir chats.
+
+O backend usa PostgreSQL com Prisma ORM. Na primeira execucao com o banco vazio, a API importa os dados antigos de `backend/data/unomatch.json` se esse arquivo existir; caso contrario, cria dados iniciais de teste.
 
 ## Rodando o projeto
 
@@ -8,6 +10,24 @@ Instale as dependencias do app:
 
 ```bash
 npm install
+```
+
+Configure o banco:
+
+```bash
+copy .env.example .env
+```
+
+Suba um PostgreSQL local. Se voce tiver Docker instalado:
+
+```bash
+docker compose up -d
+```
+
+Depois rode a migration do Prisma:
+
+```bash
+npm run db:migrate
 ```
 
 Suba o backend em um terminal:
@@ -22,7 +42,7 @@ Em outro terminal, inicie o Expo:
 npm start
 ```
 
-A API roda por padrao em `http://localhost:3333`. No emulador Android o app usa `http://10.0.2.2:3333`. Em celular fisico, defina o endereco da sua maquina na rede:
+A API roda por padrao em `http://localhost:3333`. No emulador Android ou celular fisico, o app tenta usar automaticamente o host do Expo. Se precisar, defina o endereco da sua maquina na rede:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://SEU_IP_LOCAL:3333 npm start
@@ -35,11 +55,19 @@ Use o login institucional abaixo:
 - E-mail: `julia.teste@unochapeco.edu.br`
 - Senha: `unomatch`
 
-Novas contas criadas pelo onboarding tambem usam a senha inicial `unomatch`.
+Novas contas criadas pelo onboarding usam a senha escolhida na tela de cadastro.
 
-## Backend
+## Backend e banco
 
-O backend fica em `backend/` e foi feito sem dependencias externas, usando apenas APIs nativas do Node. O banco local e gerado automaticamente em `backend/data/unomatch.json` na primeira execucao.
+O backend fica em `backend/`, usa Node HTTP nativo para as rotas e Prisma para acessar o PostgreSQL. O schema fica em `prisma/schema.prisma`, e a migration inicial fica em `prisma/migrations/`.
+
+Comandos uteis:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:studio
+```
 
 Rotas principais:
 

@@ -11,11 +11,15 @@ export default function EmailScreen() {
   const params = useLocalSearchParams<{ name?: string }>();
   const { register } = useAuth();
   const [emailUser, setEmailUser] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const normalizedEmailUser = emailUser.trim().toLowerCase();
   const hasValidUserPart = /^[a-z0-9._-]+$/.test(normalizedEmailUser);
   const fullEmail = `${normalizedEmailUser}${EMAIL_DOMAIN}`;
+  const hasPassword = password.length >= 6;
+  const canSubmit = normalizedEmailUser.length > 0 && hasValidUserPart && hasPassword && password === confirmPassword;
 
   const handleContinue = async () => {
     if (!normalizedEmailUser) {
@@ -28,13 +32,23 @@ export default function EmailScreen() {
       return;
     }
 
+    if (!hasPassword) {
+      Alert.alert('Senha invalida', 'Digite uma senha com pelo menos 6 caracteres.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Senhas diferentes', 'Confirme a mesma senha nos dois campos.');
+      return;
+    }
+
     setLoading(true);
 
     try {
       await register({
         name: params.name || 'Novo usuario',
         email: fullEmail,
-        password: 'unomatch',
+        password,
       });
       router.replace('/(tabs)');
     } catch (error) {
@@ -66,9 +80,25 @@ export default function EmailScreen() {
           <Text style={styles.domain}>{EMAIL_DOMAIN}</Text>
         </View>
 
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Confirmar senha"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
+        />
+
         <TouchableOpacity
-          style={[styles.button, (!normalizedEmailUser || !hasValidUserPart) && { opacity: 0.5 }]}
-          disabled={loading || !normalizedEmailUser || !hasValidUserPart}
+          style={[styles.button, !canSubmit && { opacity: 0.5 }]}
+          disabled={loading || !canSubmit}
           onPress={handleContinue}
         >
           <Text style={styles.buttonText}>{loading ? 'Criando conta...' : 'Continue'}</Text>
@@ -95,6 +125,12 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     minWidth: 120,
+  },
+  passwordInput: {
+    backgroundColor: '#E9ECEF',
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 12,
   },
   domain: {
     opacity: 0.8,

@@ -1,11 +1,52 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const DEFAULT_API_URL = Platform.select({
-  android: 'http://10.0.2.2:3333',
-  default: 'http://localhost:3333',
-});
+type ExpoRuntimeConstants = typeof Constants & {
+  manifest?: {
+    debuggerHost?: string;
+  };
+  manifest2?: {
+    extra?: {
+      expoClient?: {
+        hostUri?: string;
+      };
+    };
+  };
+};
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
+function apiUrlFromHostUri(hostUri?: string | null) {
+  const host = hostUri?.split('/')[0]?.split(':')[0];
+  return host ? `http://${host}:3333` : null;
+}
+
+function getExpoHostUri() {
+  const runtimeConstants = Constants as ExpoRuntimeConstants;
+  return (
+    runtimeConstants.expoConfig?.hostUri ||
+    runtimeConstants.manifest2?.extra?.expoClient?.hostUri ||
+    runtimeConstants.manifest?.debuggerHost ||
+    null
+  );
+}
+
+function getDefaultApiUrl() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:3333`;
+  }
+
+  const expoHostApiUrl = apiUrlFromHostUri(getExpoHostUri());
+  if (expoHostApiUrl) {
+    return expoHostApiUrl;
+  }
+
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:3333';
+  }
+
+  return 'http://localhost:3333';
+}
+
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || getDefaultApiUrl();
 
 export type User = {
   id: string;
@@ -63,14 +104,21 @@ type RequestOptions = RequestInit & {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { token, headers, ...fetchOptions } = options;
-  const response = await fetch(`${API_URL}${path}`, {
-    ...fetchOptions,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...fetchOptions,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+    });
+  } catch (_error) {
+    throw new Error(`Nao foi possivel conectar a API em ${API_URL}.`);
+  }
+
   const payload = await response.json();
 
   if (!response.ok) {
@@ -88,7 +136,7 @@ export const api = {
     });
   },
 
-  register(input: { name: string; email: string; password?: string }) {
+  register(input: { name: string; email: string; password: string }) {
     return request<{ token: string; user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(input),

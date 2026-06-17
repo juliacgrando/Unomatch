@@ -7,7 +7,7 @@ type AuthContextType = {
   token: string | null;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (input: { name: string; email: string; password?: string }) => Promise<void>;
+  register: (input: { name: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateProfile: (patch: Partial<User>) => Promise<void>;
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     applySession(session.token, session.user);
   }, [applySession]);
 
-  const register = useCallback(async (input: { name: string; email: string; password?: string }) => {
+  const register = useCallback(async (input: { name: string; email: string; password: string }) => {
     const session = await api.register(input);
     applySession(session.token, session.user);
   }, [applySession]);

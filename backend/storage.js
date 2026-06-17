@@ -1,9 +1,12 @@
+require('dotenv/config');
+
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { PrismaClient } = require('@prisma/client');
 
-const DATA_DIR = path.join(__dirname, 'data');
-const DATA_FILE = path.join(DATA_DIR, 'unomatch.json');
+const prisma = new PrismaClient();
+const DATA_FILE = path.join(__dirname, 'data', 'unomatch.json');
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 function createId(prefix) {
@@ -161,24 +164,107 @@ function seedState() {
   };
 }
 
-function ensureDataFile() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+function asDate(value) {
+  return value ? new Date(value) : undefined;
+}
+
+function normalizeState(state) {
+  return {
+    users: state.users.map((user) => ({
+      ...user,
+      createdAt: asDate(user.createdAt) || new Date(),
+      updatedAt: asDate(user.updatedAt),
+      interests: user.interests || [],
+    })),
+    sessions: state.sessions.map((session) => ({
+      ...session,
+      createdAt: asDate(session.createdAt) || new Date(),
+      expiresAt: asDate(session.expiresAt) || new Date(Date.now() + SESSION_TTL_MS),
+    })),
+    swipes: state.swipes.map((swipe) => ({
+      ...swipe,
+      createdAt: asDate(swipe.createdAt) || new Date(),
+    })),
+    matches: state.matches.map((match) => ({
+      ...match,
+      userIds: match.userIds || [],
+      createdAt: asDate(match.createdAt) || new Date(),
+    })),
+    messages: state.messages.map((message) => ({
+      ...message,
+      readBy: message.readBy || [],
+      createdAt: asDate(message.createdAt) || new Date(),
+    })),
+  };
+}
+
+function loadInitialState() {
+  if (fs.existsSync(DATA_FILE)) {
+    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   }
 
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(seedState(), null, 2));
+  return seedState();
+}
+
+async function replaceState(state, client = prisma) {
+  const normalized = normalizeState(state);
+
+  await client.message.deleteMany();
+  await client.match.deleteMany();
+  await client.swipe.deleteMany();
+  await client.session.deleteMany();
+  await client.user.deleteMany();
+
+  if (normalized.users.length > 0) {
+    await client.user.createMany({ data: normalized.users });
+  }
+
+  if (normalized.sessions.length > 0) {
+    await client.session.createMany({ data: normalized.sessions });
+  }
+
+  if (normalized.swipes.length > 0) {
+    await client.swipe.createMany({ data: normalized.swipes });
+  }
+
+  if (normalized.matches.length > 0) {
+    await client.match.createMany({ data: normalized.matches });
+  }
+
+  if (normalized.messages.length > 0) {
+    await client.message.createMany({ data: normalized.messages });
   }
 }
 
-function readState() {
-  ensureDataFile();
-  return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+async function ensureSeeded() {
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    return;
+  }
+
+  await prisma.$transaction(async (transaction) => {
+    await replaceState(loadInitialState(), transaction);
+  });
 }
 
-function writeState(state) {
-  ensureDataFile();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(state, null, 2));
+async function readState() {
+  await ensureSeeded();
+
+  const [users, sessions, swipes, matches, messages] = await Promise.all([
+    prisma.user.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.session.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.swipe.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.match.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.message.findMany({ orderBy: { createdAt: 'asc' } }),
+  ]);
+
+  return { users, sessions, swipes, matches, messages };
+}
+
+async function writeState(state) {
+  await prisma.$transaction(async (transaction) => {
+    await replaceState(state, transaction);
+  });
 }
 
 function publicUser(user) {
